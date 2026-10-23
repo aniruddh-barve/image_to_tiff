@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image to TIFF</title>
+<meta name="description" content="Convert JPG, PNG, WebP and other images to TIFF right in your browser. Nothing is uploaded.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6fed'/%3E%3Cpath d='M8 22l5-6 4 4 3-3 4 5z' fill='white'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #f0f2f5;
+    --border: #e1e4ea;
+    --text: #14171c;
+    --muted: #5c6573;
+    --accent: #2f6fed;
+    --accent-hover: #255fd4;
+    --accent-ink: #ffffff;
+    --accent-soft: #e9f0fe;
+    --ok: #18794a;
+    --err: #c42f2a;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 2px 8px rgba(16, 24, 40, .06);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1014;
+      --surface: #161a20;
+      --surface-2: #1d2129;
+      --border: #2a303a;
+      --text: #e7eaef;
+      --muted: #97a0ad;
+      --accent: #5b8cff;
+      --accent-hover: #779fff;
+      --accent-ink: #0a1020;
+      --accent-soft: #19233b;
+      --ok: #46c487;
+      --err: #ff6d65;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1014;
+    --surface: #161a20;
+    --surface-2: #1d2129;
+    --border: #2a303a;
+    --text: #e7eaef;
+    --muted: #97a0ad;
+    --accent: #5b8cff;
+    --accent-hover: #779fff;
+    --accent-ink: #0a1020;
+    --accent-soft: #19233b;
+    --ok: #46c487;
+    --err: #ff6d65;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 16px; }
+
+  header.top { border-bottom: 1px solid var(--border); background: var(--surface); }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+  .brand { font-weight: 700; letter-spacing: -.01em; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 10%, transparent);
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  }
+
+  .hero { padding: 36px 0 20px; }
+  .hero h1 { font-size: clamp(26px, 5vw, 34px); line-height: 1.15; margin: 0 0 8px; letter-spacing: -.02em; }
+  .hero p { margin: 0; color: var(--muted); max-width: 60ch; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    padding: 36px 16px; text-align: center; cursor: pointer;
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    background: var(--surface);
+    transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop:focus-visible { border-color: var(--accent); outline: none; }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .drop.disabled { opacity: .55; pointer-events: none; }
+  .drop svg { color: var(--accent); }
+  .drop strong { font-size: 16px; }
+  .drop small { color: var(--muted); }
+
+  .settings { margin-top: 16px; padding: 16px; display: grid; gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .settings fieldset { display: contents; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field > label, .field > .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .field .hint { font-size: 12px; color: var(--muted); }
+  select, input[type=number] {
+    width: 100%; height: 38px; padding: 0 10px;
+    font: inherit; color: var(--text);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  }
+  select:focus, input[type=number]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .seg { display: flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; height: 38px; }
+  .seg label { flex: 1; position: relative; }
+  .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .seg span {
+    display: flex; align-items: center; justify-content: center; height: 100%;
+    border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap;
+  }
+  .seg input:checked + span { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+  .seg input:focus-visible + span { outline: 2px solid var(--accent); }
+  .threshold { grid-column: 1 / -1; display: none; align-items: center; gap: 12px; }
+  .threshold.show { display: flex; }
+  .threshold input { flex: 1; accent-color: var(--accent); }
+  .threshold output { font-variant-numeric: tabular-nums; width: 3ch; text-align: right; }
+
+  .list { margin-top: 16px; }
+  .list:empty { display: none; }
+  .item {
+    display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    padding: 10px 12px; border-top: 1px solid var(--border);
+  }
+  .item:first-child { border-top: 0; }
+  .thumb {
+    width: 56px; height: 56px; border-radius: 8px; object-fit: cover;
+    background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 12px 12px;
+    border: 1px solid var(--border);
+  }
+  .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { font-size: 13px; color: var(--muted); }
+  .meta .ok { color: var(--ok); }
+  .meta .err { color: var(--err); }
+  .acts { display: flex; align-items: center; gap: 4px; }
+  .icon-btn {
+    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .icon-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+  .icon-btn:disabled { opacity: .35; cursor: default; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .bar {
+    position: sticky; bottom: 0; margin-top: 16px; padding: 12px 0 16px;
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+  }
+  .bar .card { display: flex; align-items: center; gap: 12px; padding: 12px; flex-wrap: wrap; }
+  .bar .summary { flex: 1; min-width: 160px; font-size: 14px; color: var(--muted); }
+  .bar .summary b { color: var(--text); font-weight: 600; }
+  .btn {
+    height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border);
+    font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap;
+    background: var(--surface); color: var(--text);
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  }
+  .btn:hover:not(:disabled) { background: var(--surface-2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+  .hidden { display: none !important; }
+
+  .faq { margin: 28px 0 8px; display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .faq div { padding: 16px; }
+  .faq h3 { margin: 0 0 4px; font-size: 14px; }
+  .faq p { margin: 0; font-size: 13px; color: var(--muted); }
+  footer { padding: 24px 0 40px; font-size: 13px; color: var(--muted); text-align: center; }
+  footer a { color: inherit; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100% - 32px);
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 720px) {
+    .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .faq { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 420px) {
+    .settings { grid-template-columns: 1fr; }
+    .item { grid-template-columns: 48px minmax(0, 1fr); }
+    .thumb { width: 48px; height: 48px; }
+    .acts { grid-column: 1 / -1; justify-content: flex-end; margin-top: -4px; }
+    .bar .summary { flex-basis: 100%; }
+    .bar .btn { flex: 1; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="https://adsfreepdf.vercel.app/">adsfree<span>pdf</span></a>
+    <span class="pill">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      Runs in your browser
+    </span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Image to TIFF</h1>
+    <p>Convert JPG, PNG, WebP, GIF, BMP and AVIF images to TIFF. Your images are converted on this device and are never uploaded.</p>
+  </section>
+
+  <div id="drop" class="drop" role="button" tabindex="0" aria-label="Choose images to convert">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+    <strong>Drop images here, or click to choose</strong>
+    <small>You can also paste an image with Ctrl+V</small>
+    <input id="file" type="file" accept="image/*" multiple hidden>
+  </div>
+
+  <form class="settings card" id="settings" onsubmit="return false">
+    <fieldset id="settingsSet">
+      <div class="field">
+        <span class="label" id="outLabel">Output</span>
+        <div class="seg" role="radiogroup" aria-labelledby="outLabel">
+          <label><input type="radio" name="output" value="separate" checked><span>One per image</span></label>
+          <label><input type="radio" name="output" value="multi"><span>Multi-page</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="compression">Compression</label>
+        <select id="compression">
+          <option value="lzw">LZW (recommended)</option>
+          <option value="deflate">Deflate (smallest)</option>
+          <option value="packbits">PackBits</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="mode">Color</label>
+        <select id="mode">
+          <option value="auto">Auto</option>
+          <option value="rgb">RGB</option>
+          <option value="rgba">RGB + transparency</option>
+          <option value="gray">Grayscale</option>
+          <option value="bw">Black &amp; white (1-bit)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="dpi">Resolution (DPI)</label>
+        <input id="dpi" type="number" min="1" max="10000" step="1" value="300" list="dpis" inputmode="numeric">
+        <datalist id="dpis"><option value="72"><option value="96"><option value="150"><option value="200"><option value="300"><option value="600"></datalist>
+      </div>
+      <div class="threshold field" id="thresholdRow">
+        <label for="threshold">Black &amp; white threshold</label>
+        <input id="threshold" type="range" min="1" max="254" value="128">
+        <output id="thresholdOut" for="threshold">128</output>
+      </div>
+    </fieldset>
+    <p class="hint" id="hint" style="grid-column:1/-1;margin:-4px 0 0;font-size:13px;color:var(--muted)"></p>
+  </form>
+
+  <div class="list card" id="list"></div>
+
+  <div class="bar hidden" id="bar">
+    <div class="card">
+      <div class="summary" id="summary"></div>
+      <button class="btn ghost" id="clear" type="button">Clear</button>
+      <button class="btn primary" id="convert" type="button">Convert to TIFF</button>
+      <button class="btn primary hidden" id="download" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>
+        <span>Download</span>
+      </button>
+    </div>
+  </div>
+
+  <section class="faq">
+    <div class="card"><h3>Private by design</h3><p>Images are decoded and encoded by your browser. No upload, no account, no ads.</p></div>
+    <div class="card"><h3>Lossless output</h3><p>Pixels are written exactly as decoded, with LZW, Deflate or PackBits compression.</p></div>
+    <div class="card"><h3>Multi-page TIFF</h3><p>Combine several images into one TIFF, in the order shown. Use the arrows to reorder.</p></div>
+  </section>
+</main>
+
+<footer><a href="https://adsfreepdf.vercel.app/">adsfreepdf</a> · Free tools that run on your device</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// ENCODER-START
+// Self-contained so it can run inside a Web Worker (built from its source text) or on the main thread.
+function encoderModule() {
+  // LZW dictionary keyed by (prefix << 8 | byte). A generation stamp avoids clearing 1M entries on every reset.
+  const codes = new Uint16Array(4096 * 256);
+  const stamps = new Uint32Array(4096 * 256);
+  let gen = 0;
+
+  // TIFF LZW, MSB-first codes. Mirrors libtiff's encoder, including the code width change before EOI.
+  function lzw(src) {
+    const out = new Uint8Array(Math.ceil(src.length * 1.55) + 64);
+    let op = 0, buf = 0, bits = 0, nbits = 9, maxcode = 511, free = 258;
+    const put = (code) => {
+      buf = (buf << nbits) | code;
+      bits += nbits;
+      while (bits >= 8) { bits -= 8; out[op++] = (buf >>> bits) & 255; }
+      buf &= (1 << bits) - 1;
+    };
+    const reset = () => {
+      if (++gen === 0xffffffff) { stamps.fill(0); gen = 1; }
+      free = 258; nbits = 9; maxcode = 511;
+    };
+    reset();
+    put(256);
+    if (src.length) {
+      let ent = src[0];
+      for (let i = 1; i < src.length; i++) {
+        const c = src[i];
+        const k = (ent << 8) | c;
+        if (stamps[k] === gen) { ent = codes[k]; continue; }
+        put(ent);
+        ent = c;
+        codes[k] = free; stamps[k] = gen; free++;
+        if (free === 4094) { put(256); reset(); }
+        else if (free > maxcode) { nbits++; maxcode = (1 << nbits) - 1; }
+      }
+      put(ent);
+      free++;
+      if (free === 4094) { put(256); nbits = 9; }
+      else if (free > maxcode) nbits++;
+    }
+    put(257);
+    if (bits > 0) out[op++] = (buf << (8 - bits)) & 255;
+    return out.slice(0, op);
+  }
+
+  // PackBits, each row packed on its own as the TIFF spec requires.
+  function packbits(src, rowBytes) {
+    const rows = src.length / rowBytes;
+    const out = new Uint8Array(src.length + Math.ceil(src.length / 128) + rows + 16);
+    let op = 0;
+    for (let r = 0; r < rows; r++) {
+      const end = (r + 1) * rowBytes;
+      let i = r * rowBytes;
+      while (i < end) {
+        let run = 1;
+        while (i + run < end && run < 128 && src[i + run] === src[i]) run++;
+        if (run >= 2) {
+          out[op++] = 257 - run;
+          out[op++] = src[i];
+          i += run;
+          continue;
+        }
+        let j = i;
+        while (j < end && j - i < 128 && !(j + 2 < end && src[j] === src[j + 1] && src[j] === src[j + 2])) j++;
+        out[op++] = j - i - 1;
+        out.set(src.subarray(i, j), op);
+        op += j - i;
+        i = j;
+      }
+    }
+    return out.slice(0, op);
+  }
+
+  async function deflate(src) {
+    const stream = new Blob([src]).stream().pipeThrough(new CompressionStream('deflate'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  // Horizontal differencing (Predictor 2) for 8-bit samples, in place.
+  function predict(chunk, rows, rowBytes, spp) {
+    for (let r = 0; r < rows; r++) {
+      const base = r * rowBytes;
+      for (let i = base + rowBytes - 1; i >= base + spp; i--) chunk[i] -= chunk[i - spp];
+    }
+  }
+
+  // RGBA from a canvas (unpremultiplied) to the samples for the chosen color mode.
+  function toSamples(rgba, w, h, mode, threshold) {
+    const n = w * h;
+    if (mode === 'auto') {
+      mode = 'rgb';
+      for (let i = 3; i < rgba.length; i += 4) if (rgba[i] !== 255) { mode = 'rgba'; break; }
+    }
+    if (mode === 'rgba') return { mode, data: rgba, spp: 4, bps: 8, photometric: 2, alpha: true, rowBytes: w * 4 };
+
+    // Everything else is flattened onto white.
+    const flat = (i, c) => {
+      const a = rgba[i + 3];
+      return a === 255 ? rgba[i + c] : (rgba[i + c] * a + 255 * (255 - a) + 127) / 255 | 0;
+    };
+    if (mode === 'rgb') {
+      const out = new Uint8Array(n * 3);
+      for (let i = 0, j = 0; j < out.length; i += 4, j += 3) {
+        out[j] = flat(i, 0); out[j + 1] = flat(i, 1); out[j + 2] = flat(i, 2);
+      }
+      return { mode, data: out, spp: 3, bps: 8, photometric: 2, alpha: false, rowBytes: w * 3 };
+    }
+    const lum = (i) => (flat(i, 0) * 299 + flat(i, 1) * 587 + flat(i, 2) * 114 + 500) / 1000 | 0;
+    if (mode === 'gray') {
+      const out = new Uint8Array(n);
+      for (let p = 0; p < n; p++) out[p] = lum(p * 4);
+      return { mode, data: out, spp: 1, bps: 8, photometric: 1, alpha: false, rowBytes: w };
+    }
+    // 1-bit, BlackIsZero: a set bit is white.
+    const rowBytes = (w + 7) >> 3;
+    const out = new Uint8Array(rowBytes * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (lum((y * w + x) * 4) >= threshold) out[y * rowBytes + (x >> 3)] |= 0x80 >> (x & 7);
+      }
+    }
+    return { mode, data: out, spp: 1, bps: 1, photometric: 1, alpha: false, rowBytes };
+  }
+
+  const COMPRESSION = { none: 1, lzw: 5, deflate: 8, packbits: 32773 };
+
+  // Returns one page: its tag values plus compressed strips, each in its own buffer.
+  async function encodePage(rgba, w, h, opts) {
+    const s = toSamples(rgba, w, h, opts.mode, opts.threshold);
+    const compression = COMPRESSION[opts.compression] || 5;
+    const rowsPerStrip = Math.max(1, Math.min(h, Math.floor(65536 / s.rowBytes)));
+    const usePredictor = (compression === 5 || compression === 8) && s.bps === 8;
+    const strips = [];
+    for (let y = 0; y < h; y += rowsPerStrip) {
+      const rows = Math.min(rowsPerStrip, h - y);
+      const chunk = s.data.slice(y * s.rowBytes, (y + rows) * s.rowBytes);
+      if (usePredictor) predict(chunk, rows, s.rowBytes, s.spp);
+      if (compression === 5) strips.push(lzw(chunk));
+      else if (compression === 8) strips.push(await deflate(chunk));
+      else if (compression === 32773) strips.push(packbits(chunk, s.rowBytes));
+      else strips.push(chunk);
+    }
+    return {
+      width: w, height: h, mode: s.mode, spp: s.spp, bps: s.bps, photometric: s.photometric, alpha: s.alpha,
+      compression, predictor: usePredictor ? 2 : 1, rowsPerStrip, strips,
+    };
+  }
+
+  return { encodePage };
+}
+
+// Lays out pages from encodePage as a little-endian TIFF; several pages make a multi-page file.
+function assembleTiff(pages, dpi) {
+  const SIZE = { 2: 1, 3: 2, 4: 4, 5: 8 };
+  const res = [Math.round(dpi * 1000), 1000];
+  let pos = 8;
+  const plan = pages.map((p) => {
+    const offsets = [];
+    for (const s of p.strips) { offsets.push(pos); pos += s.length; pos += pos & 1; }
+    const tags = [
+      [256, 4, [p.width]],
+      [257, 4, [p.height]],
+      [258, 3, new Array(p.spp).fill(p.bps)],
+      [259, 3, [p.compression]],
+      [262, 3, [p.photometric]],
+      [273, 4, offsets],
+      [277, 3, [p.spp]],
+      [278, 4, [p.rowsPerStrip]],
+      [279, 4, p.strips.map((s) => s.length)],
+      [282, 5, res],
+      [283, 5, res],
+      [284, 3, [1]],
+      [296, 3, [2]],
+      [305, 2, 'adsfreepdf Image to TIFF'],
+    ];
+    if (p.predictor !== 1) tags.push([317, 3, [p.predictor]]);
+    if (p.alpha) tags.push([338, 3, [2]]);
+    const entries = tags.map(([tag, type, values]) => {
+      const count = type === 2 ? values.length + 1 : type === 5 ? values.length / 2 : values.length;
+      return { tag, type, values, count, bytes: count * SIZE[type], at: 0 };
+    });
+    const ifd = pos;
+    pos += 2 + entries.length * 12 + 4;
+    for (const e of entries) if (e.bytes > 4) { e.at = pos; pos += e.bytes; pos += pos & 1; }
+    return { p, offsets, entries, ifd };
+  });
+
+  const out = new Uint8Array(pos);
+  const dv = new DataView(out.buffer);
+  out[0] = out[1] = 0x49;
+  dv.setUint16(2, 42, true);
+  dv.setUint32(4, plan[0].ifd, true);
+  plan.forEach(({ p, offsets, entries, ifd }, idx) => {
+    p.strips.forEach((s, i) => out.set(s, offsets[i]));
+    dv.setUint16(ifd, entries.length, true);
+    entries.forEach((e, i) => {
+      const at = ifd + 2 + i * 12;
+      dv.setUint16(at, e.tag, true);
+      dv.setUint16(at + 2, e.type, true);
+      dv.setUint32(at + 4, e.count, true);
+      let v = at + 8;
+      if (e.bytes > 4) { dv.setUint32(v, e.at, true); v = e.at; }
+      if (e.type === 2) {
+        for (let c = 0; c < e.values.length; c++) out[v + c] = e.values.charCodeAt(c) & 127;
+      } else {
+        const step = e.type === 3 ? 2 : 4;
+        e.values.forEach((x, k) => {
+          if (step === 2) dv.setUint16(v + k * 2, x, true);
+          else dv.setUint32(v + k * 4, x, true);
+        });
+      }
+    });
+    dv.setUint32(ifd + 2 + entries.length * 12, idx + 1 < plan.length ? plan[idx + 1].ifd : 0, true);
+  });
+  return out;
+}
+// ENCODER-END
+
+// ---- Encoding runs in a worker so large images don't freeze the page ----
+const encoder = (() => {
+  let local = null;
+  const runLocal = (rgba, w, h, opts) => (local ||= encoderModule()).encodePage(rgba, w, h, opts);
+  let worker = null;
+  const pending = new Map();
+  let seq = 0;
+  const ready = new Promise((resolve) => {
+    try {
+      const src = `const M = (${encoderModule.toString()})();
+self.onmessage = async (e) => {
+  const { id, rgba, w, h, opts } = e.data;
+  if (id === 0) return self.postMessage({ id: 0 });
+  try {
+    const page = await M.encodePage(new Uint8Array(rgba), w, h, opts);
+    self.postMessage({ id, page }, page.strips.map((s) => s.buffer));
+  } catch (err) {
+    self.postMessage({ id, error: String((err && err.message) || err) });
+  }
+};`;
+      const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      const timer = setTimeout(() => resolve(false), 3000);
+      w.onmessage = (e) => {
+        const { id, page, error } = e.data;
+        if (id === 0) { clearTimeout(timer); worker = w; return resolve(true); }
+        const p = pending.get(id);
+        if (!p) return;
+        pending.delete(id);
+        error ? p.reject(new Error(error)) : p.resolve(page);
+      };
+      w.onerror = () => { clearTimeout(timer); resolve(false); };
+      w.postMessage({ id: 0 });
+    } catch {
+      resolve(false);
+    }
+  });
+  return {
+    async encode(imageData, opts) {
+      await ready;
+      const { data, width, height } = imageData;
+      if (!worker) return runLocal(data, width, height, opts);
+      const id = ++seq;
+      return new Promise((resolve, reject) => {
+        pending.set(id, { resolve, reject });
+        worker.postMessage({ id, rgba: data.buffer, w: width, h: height, opts }, [data.buffer]);
+      });
+    },
+  };
+})();
+
+// ---- ZIP (stored, no compression: TIFF data is already compressed) ----
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(u8) {
+  let c = 0xffffffff;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+function makeZip(files) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const head = new DataView(new ArrayBuffer(30));
+    head.setUint32(0, 0x04034b50, true);
+    head.setUint16(4, 20, true);
+    head.setUint16(6, 0x0800, true);
+    head.setUint16(10, time, true);
+    head.setUint16(12, date, true);
+    head.setUint32(14, crc, true);
+    head.setUint32(18, f.data.length, true);
+    head.setUint32(22, f.data.length, true);
+    head.setUint16(26, name.length, true);
+    parts.push(head, name, f.data);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true);
+    cd.setUint16(4, 20, true);
+    cd.setUint16(6, 20, true);
+    cd.setUint16(8, 0x0800, true);
+    cd.setUint16(12, time, true);
+    cd.setUint16(14, date, true);
+    cd.setUint32(16, crc, true);
+    cd.setUint32(20, f.data.length, true);
+    cd.setUint32(24, f.data.length, true);
+    cd.setUint16(28, name.length, true);
+    cd.setUint32(42, offset, true);
+    central.push(cd, name);
+    offset += 30 + name.length + f.data.length;
+  }
+  const cdSize = central.reduce((s, p) => s + p.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true);
+  end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true);
+  end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end], { type: 'application/zip' });
+}
+
+// ---- App ----
+const $ = (s) => document.querySelector(s);
+const state = { items: [], busy: false, combined: null };
+let uid = 0;
+const SETTINGS_KEY = 'img2tiff.settings';
+const IMAGE_EXT = /\.(jpe?g|jfif|png|webp|gif|bmp|avif|svg|ico|heic|heif|tiff?)$/i;
+
+const HINTS = {
+  lzw: 'Lossless and opens in virtually every app.',
+  deflate: 'Lossless and usually smallest, but a few older apps can’t open it.',
+  packbits: 'Light, fast compression. Good for flat graphics and scans.',
+  none: 'No compression. Biggest files, works with anything.',
+};
+
+function getOpts() {
+  const dpi = Math.min(10000, Math.max(1, Number($('#dpi').value) || 300));
+  return {
+    output: document.querySelector('input[name=output]:checked').value,
+    compression: $('#compression').value,
+    mode: $('#mode').value,
+    dpi,
+    threshold: Number($('#threshold').value),
+  };
+}
+
+function applySettings() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch {}
+  if (s.output) { const r = document.querySelector(`input[name=output][value="${s.output}"]`); if (r) r.checked = true; }
+  for (const k of ['compression', 'mode']) {
+    if (s[k] && [...$('#' + k).options].some((o) => o.value === s[k])) $('#' + k).value = s[k];
+  }
+  if (s.dpi) $('#dpi').value = s.dpi;
+  if (s.threshold) $('#threshold').value = s.threshold;
+  if (typeof CompressionStream === 'undefined') {
+    const opt = $('#compression').querySelector('option[value=deflate]');
+    opt.disabled = true;
+    opt.textContent += ' (not supported here)';
+    if ($('#compression').value === 'deflate') $('#compression').value = 'lzw';
+  }
+}
+
+function onSettingsChange() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(getOpts())); } catch {}
+  invalidate();
+  render();
+}
+
+function baseName(name) { return name.replace(/\.[^.]+$/, '') || 'image'; }
+function fmtSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(b < 10240 ? 1 : 0) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function addFiles(list) {
+  if (state.busy) return;
+  let added = 0;
+  for (const file of list) {
+    if (!file.type.startsWith('image/') && !IMAGE_EXT.test(file.name)) continue;
+    const it = { id: ++uid, file, name: file.name || 'pasted-image.png', url: URL.createObjectURL(file), w: 0, h: 0, status: 'loading', msg: '', out: null };
+    state.items.push(it);
+    probe(it);
+    added++;
+  }
+  if (!added && list.length) toast('Those files aren’t images.');
+  invalidate();
+  render();
+}
+
+function probe(it) {
+  const img = new Image();
+  img.onload = () => {
+    it.w = img.naturalWidth || 1024;
+    it.h = img.naturalHeight || 1024;
+    it.status = 'ready';
+    render();
+  };
+  img.onerror = () => {
+    it.status = 'error';
+    it.msg = /\.(heic|heif)$/i.test(it.name) ? 'This browser can’t open HEIC. Try Safari, or export as JPG first.'
+      : /\.tiff?$/i.test(it.name) ? 'This browser can’t open TIFF files as input.'
+      : 'This browser can’t open this image.';
+    render();
+  };
+  img.src = it.url;
+}
+
+async function decode(it) {
+  const img = new Image();
+  img.src = it.url;
+  await img.decode();
+  const w = img.naturalWidth || 1024, h = img.naturalHeight || 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  try {
+    return ctx.getImageData(0, 0, w, h);
+  } catch {
+    throw new Error('Image is too large for this browser to process.');
+  } finally {
+    canvas.width = canvas.height = 0;
+  }
+}
+
+function makeOut(bytes, name) {
+  return { blob: new Blob([bytes], { type: 'image/tiff' }), name, size: bytes.length };
+}
+
+function invalidate() {
+  if (state.busy) return;
+  for (const it of state.items) {
+    it.out = null;
+    if (it.status === 'done' || it.status === 'failed') { it.status = 'ready'; it.msg = ''; }
+  }
+  state.combined = null;
+}
+
+async function convert() {
+  const opts = getOpts();
+  const todo = state.items.filter((i) => i.status === 'ready');
+  if (!todo.length) return;
+  state.busy = true;
+  render();
+  const pages = [];
+  for (const it of todo) {
+    it.status = 'working';
+    render();
+    try {
+      const page = await encoder.encode(await decode(it), opts);
+      if (opts.output === 'separate') it.out = makeOut(assembleTiff([page], opts.dpi), baseName(it.name) + '.tif');
+      else pages.push(page);
+      it.status = 'done';
+      it.msg = page.mode;
+    } catch (e) {
+      it.status = 'failed';
+      it.msg = (e && e.message) || 'Conversion failed.';
+    }
+    render();
+  }
+  if (pages.length) {
+    const first = todo.find((i) => i.status === 'done');
+    state.combined = makeOut(assembleTiff(pages, opts.dpi), baseName(first.name) + (pages.length > 1 ? '-multipage' : '') + '.tif');
+  }
+  state.busy = false;
+  render();
+  const failed = todo.filter((i) => i.status === 'failed').length;
+  if (failed) toast(`${failed} image${failed > 1 ? 's' : ''} couldn’t be converted.`);
+}
+
+async function downloadAll() {
+  if (state.combined) return saveBlob(state.combined.blob, state.combined.name);
+  const outs = state.items.filter((i) => i.out).map((i) => i.out);
+  if (outs.length === 1) return saveBlob(outs[0].blob, outs[0].name);
+  const used = new Set();
+  const files = [];
+  for (const o of outs) {
+    let name = o.name, n = 2;
+    while (used.has(name.toLowerCase())) name = o.name.replace(/\.tif$/, `-${n++}.tif`);
+    used.add(name.toLowerCase());
+    files.push({ name, data: new Uint8Array(await o.blob.arrayBuffer()) });
+  }
+  saveBlob(makeZip(files), 'tiff-images.zip');
+}
+
+const ICONS = {
+  up: '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>',
+  down: '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>',
+  remove: '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+  save: '<path d="M12 4v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>',
+};
+function iconBtn(kind, label, onClick, disabled) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'icon-btn';
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.disabled = !!disabled;
+  b.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[kind]}</svg>`;
+  b.onclick = onClick;
+  return b;
+}
+
+const MODE_LABEL = { rgb: 'RGB', rgba: 'RGB + transparency', gray: 'Grayscale', bw: '1-bit' };
+
+function render() {
+  const list = $('#list');
+  list.replaceChildren();
+  const multi = getOpts().output === 'multi';
+  state.items.forEach((it, idx) => {
+    const row = document.createElement('div');
+    row.className = 'item';
+
+    const thumb = document.createElement('img');
+    thumb.className = 'thumb';
+    thumb.alt = '';
+    thumb.loading = 'lazy';
+    if (it.status !== 'error') thumb.src = it.url;
+
+    const info = document.createElement('div');
+    info.style.minWidth = '0';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = it.name;
+    name.title = it.name;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const dims = it.w ? `${it.w} × ${it.h} · ` : '';
+    const prefix = multi && state.items.length > 1 && it.status !== 'error' ? `Page ${state.items.filter((x, i) => i <= idx && x.status !== 'error').length} · ` : '';
+    if (it.status === 'error' || it.status === 'failed') {
+      meta.innerHTML = `<span class="err"></span>`;
+      meta.firstChild.textContent = it.msg;
+    } else if (it.status === 'done' && it.out) {
+      meta.innerHTML = `${prefix}${dims}${fmtSize(it.file.size)} → <span class="ok">${fmtSize(it.out.size)} TIFF</span> · ${MODE_LABEL[it.msg] || ''}`;
+    } else if (it.status === 'done') {
+      meta.innerHTML = `${prefix}${dims}<span class="ok">Added to multi-page TIFF</span> · ${MODE_LABEL[it.msg] || ''}`;
+    } else if (it.status === 'working') {
+      meta.textContent = `${prefix}${dims}Converting…`;
+    } else if (it.status === 'loading') {
+      meta.textContent = 'Reading…';
+    } else {
+      meta.textContent = `${prefix}${dims}${fmtSize(it.file.size)}`;
+    }
+    info.append(name, meta);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    if (it.status === 'working') {
+      const sp = document.createElement('div');
+      sp.className = 'spinner';
+      sp.setAttribute('aria-label', 'Converting');
+      acts.append(sp);
+    } else {
+      if (it.out) acts.append(iconBtn('save', 'Download ' + it.out.name, () => saveBlob(it.out.blob, it.out.name)));
+      acts.append(
+        iconBtn('up', 'Move up', () => move(idx, -1), state.busy || idx === 0),
+        iconBtn('down', 'Move down', () => move(idx, 1), state.busy || idx === state.items.length - 1),
+        iconBtn('remove', 'Remove', () => remove(idx), state.busy),
+      );
+    }
+    row.append(thumb, info, acts);
+    list.append(row);
+  });
+
+  const ready = state.items.filter((i) => i.status === 'ready').length;
+  const outs = state.items.filter((i) => i.out);
+  const hasResult = !!state.combined || outs.length > 0;
+  $('#bar').classList.toggle('hidden', state.items.length === 0);
+  $('#drop').classList.toggle('disabled', state.busy);
+  $('#settingsSet').disabled = state.busy;
+  $('#clear').disabled = state.busy;
+
+  const convertBtn = $('#convert');
+  convertBtn.classList.toggle('hidden', hasResult && !ready && !state.busy);
+  convertBtn.disabled = state.busy || !ready;
+  convertBtn.textContent = state.busy ? 'Converting…' : 'Convert to TIFF';
+
+  const dl = $('#download');
+  dl.classList.toggle('hidden', !hasResult || state.busy || ready > 0);
+  dl.querySelector('span').textContent = state.combined || outs.length === 1 ? 'Download TIFF' : `Download all (.zip)`;
+
+  const n = state.items.length;
+  const s = $('#summary');
+  if (state.combined) {
+    s.innerHTML = `<b>1 multi-page TIFF</b> · ${fmtSize(state.combined.size)}`;
+  } else if (outs.length && !ready) {
+    s.innerHTML = `<b>${outs.length} TIFF file${outs.length > 1 ? 's' : ''}</b> · ${fmtSize(outs.reduce((a, o) => a + o.out.size, 0))}`;
+  } else {
+    s.innerHTML = `<b>${n} image${n === 1 ? '' : 's'}</b>${multi && n > 1 ? ' → one multi-page TIFF' : ''}`;
+  }
+
+  const opts = getOpts();
+  $('#thresholdRow').classList.toggle('show', opts.mode === 'bw');
+  $('#thresholdOut').textContent = opts.threshold;
+  $('#hint').textContent = HINTS[opts.compression];
+}
+
+function move(idx, d) {
+  const j = idx + d;
+  if (j < 0 || j >= state.items.length) return;
+  [state.items[idx], state.items[j]] = [state.items[j], state.items[idx]];
+  if (state.combined) invalidate();
+  render();
+}
+function remove(idx) {
+  const [it] = state.items.splice(idx, 1);
+  URL.revokeObjectURL(it.url);
+  if (state.combined) invalidate();
+  render();
+}
+function clearAll() {
+  for (const it of state.items) URL.revokeObjectURL(it.url);
+  state.items = [];
+  state.combined = null;
+  $('#file').value = '';
+  render();
+}
+
+// ---- Wiring ----
+const drop = $('#drop');
+const fileInput = $('#file');
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value = ''; });
+['dragenter', 'dragover'].forEach((t) => document.addEventListener(t, (e) => {
+  if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+  e.preventDefault();
+  drop.classList.add('over');
+}));
+['dragleave', 'drop'].forEach((t) => document.addEventListener(t, (e) => {
+  if (t === 'dragleave' && e.relatedTarget) return;
+  drop.classList.remove('over');
+}));
+document.addEventListener('drop', (e) => {
+  if (!e.dataTransfer?.files.length) return;
+  e.preventDefault();
+  addFiles([...e.dataTransfer.files]);
+});
+document.addEventListener('paste', (e) => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+$('#settings').addEventListener('change', onSettingsChange);
+$('#threshold').addEventListener('input', () => { $('#thresholdOut').textContent = $('#threshold').value; });
+$('#convert').addEventListener('click', convert);
+$('#download').addEventListener('click', downloadAll);
+$('#clear').addEventListener('click', clearAll);
+
+applySettings();
+render();
+</script>
+</body>
+</html>
